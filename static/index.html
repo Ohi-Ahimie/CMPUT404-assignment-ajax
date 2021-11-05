@@ -7,6 +7,7 @@
     <meta name="viewport" content="width=device-width" />
     <meta name="license" content="
         Copyright 2013 Abram Hindle
+        Copyright 2019 Hazel Victoria Campbell
         
         Licensed under the Apache License, Version 2.0 (the "License");
         you may not use this file except in compliance with the License.
@@ -30,7 +31,9 @@ var host = window.location.host;
 var context = canvas.getContext("2d");
 var W = canvas.width  = window.innerWidth-6;
 var H = canvas.height = window.innerHeight-50;
-
+var id = "L"+Math.floor(20000000*Math.random());
+var img = document.createElement("img");
+img.src = "https://i.kym-cdn.com/photos/images/original/000/869/487/ccf.png";
 
 function sendJSONXMLHTTPRequest(url, objects, callback) {
     var xhr = new XMLHttpRequest();
@@ -65,8 +68,13 @@ function drawCircle(context,entity) {
         //moveTo(x,y);
         fillStyle = entity["colour"];
         strokeStyle = fillStyle;
-        arc(x, y, (entity["radius"])?entity["radius"]:50, 0, 2.0 * Math.PI, false);  
-        stroke();                                
+        if (entity["radius"] <= 10){
+            context.drawImage(img, x, y, 50, 50);
+        } else{
+            arc(x, y, (entity["radius"])?entity["radius"]:50, 0, 2.0 * Math.PI, false);  
+            stroke(); 
+        }
+                                
     }
 }
 
@@ -135,9 +143,21 @@ function getPosition(e) {
 
 
 function addEntity(entity, data) {
-    world[entity] = data;
-    drawNextFrame(); // (but should we?)
+    // world[entity] = data;
+    
     //XXX: Send a XHTML Request that updates the entity you just  modified!
+    request = new Request("http://127.0.0.1:5000/entity/" + entity, {
+        method: "POST", 
+        body: JSON.stringify(data),
+        headers: {'Accept': 'application/json', 'Content-Type': 'application/json'}
+    });
+
+    // console.log(request);
+
+    fetch(request).then(function(response){
+        drawNextFrame(); // (but should we?)
+        // console.log("complete");
+    });
 
 }
 
@@ -247,11 +267,11 @@ mouse = (function() {
 // Add the application specific mouse listeners!
 //XXX: TODO Make these prettier!
 mouse.mousedowners.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'blue'});
+    addEntityWithoutName({'x':x,'y':y,'colour':"rgb(" + (20+Math.random()*236) + "," + (20+Math.random()*236) + "," + (20+Math.random()*236) + ")"});
 });
 
 mouse.mouseuppers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'red'});
+    addEntityWithoutName({'x':x,'y':y,'colour':"rgb(" + (20+Math.random()*236) + "," + (20+Math.random()*236) + "," + (20+Math.random()*236) + ")"});
 });
 
 mouse.mousedraggers.push(function(x,y,clicked,e) {
@@ -262,9 +282,31 @@ mouse.mousedraggers.push(function(x,y,clicked,e) {
 
 function update() {
     //XXX: TODO Get the world from the webservice using a XMLHTTPRequest
+    request = new Request("http://127.0.0.1:5000/listener/" + id);
+
+    // console.log();
+    fetch(request).then(function(response){
+        return response.json().then(function(body){
+            for (k in body){
+                world[k] = body[k];
+            }
+            drawNextFrame()
+        });
+    });
+    // console.log(world);
     drawFrame();
 }
 
+function register(){
+    request = new Request("http://127.0.0.1:5000/listener/" + id, {
+        method: "POST", 
+        body: JSON.stringify({}),
+        headers: {'Accept': 'application/json', 'Content-Type': 'application/json'}
+    });
+    fetch(request);
+}
+
+setTimeout(register, 0);
 // 30 frames per second
 setInterval( update, 1000/30.0);
 

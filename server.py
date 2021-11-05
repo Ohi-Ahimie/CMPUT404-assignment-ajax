@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 # Copyright 2013 Abram Hindle
+# Copyright 2019 Hazel Victoria Campbell
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +23,8 @@
 
 
 import flask
-from flask import Flask, request
+from flask import Flask, request, redirect
+import os
 import json
 app = Flask(__name__)
 app.debug = True
@@ -44,15 +46,30 @@ class World:
 
     def set(self, entity, data):
         self.space[entity] = data
+        self.notify_all(entity,data)
 
     def clear(self):
         self.space = dict()
+        self.listeners = dict()
 
     def get(self, entity):
         return self.space.get(entity,dict())
     
     def world(self):
         return self.space
+
+    def notify_all(self,entity,data):
+        for listener in self.listeners:
+           self.listeners[listener][entity] = data
+
+    def add_listener(self,listener_name):
+        self.listeners[listener_name] = dict()
+
+    def get_listener(self, listener_name):
+        return self.listeners[listener_name]
+
+    def clear_listener(self, listener_name):
+        self.listeners[listener_name] = dict()
 
 # you can test your webservice from the commandline
 # curl -v   -H "Content-Type: application/json" -X PUT http://127.0.0.1:5000/entity/X -d '{"x":1,"y":1}' 
@@ -74,27 +91,43 @@ def flask_post_json():
 @app.route("/")
 def hello():
     '''Return something coherent here.. perhaps redirect to /static/index.html '''
-    return None
+    return redirect('/static/index.html')
+
 
 @app.route("/entity/<entity>", methods=['POST','PUT'])
 def update(entity):
     '''update the entities via this interface'''
-    return None
+    body = flask_post_json()
+    # print(body)
+    myWorld.set(entity, body)
+    return myWorld.get(entity)
 
 @app.route("/world", methods=['POST','GET'])    
 def world():
     '''you should probably return the world here'''
-    return None
+    return json.JSONEncoder().encode(myWorld.space)
 
 @app.route("/entity/<entity>")    
 def get_entity(entity):
     '''This is the GET version of the entity interface, return a representation of the entity'''
-    return None
+    return json.JSONEncoder().encode(myWorld.get(entity))
 
 @app.route("/clear", methods=['POST','GET'])
 def clear():
     '''Clear the world out!'''
-    return None
+    myWorld.clear()
+    return json.JSONEncoder().encode(myWorld.space)
+
+@app.route("/listener/<entity>", methods=['POST','PUT'])
+def add_listener(entity):
+    myWorld.add_listener( entity )
+    return flask.jsonify(dict())
+
+@app.route("/listener/<entity>")    
+def get_listener(entity):
+    v = myWorld.get_listener(entity)
+    myWorld.clear_listener(entity)
+    return flask.jsonify( v )
 
 if __name__ == "__main__":
     app.run()
